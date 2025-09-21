@@ -17,6 +17,8 @@ Supported platforms:
 
 Find the architecture [here](./docs/architecture.md)
 
+Platform-specific SSML notes and voice catalogues are tracked in [`docs/platforms`](./docs/platforms/README.md). The helper command `npm run docs:update-voices` regenerates the catalogues when vendor credentials are available.
+
 ## Quick start
 
 ### SSML - Amazon Alexa

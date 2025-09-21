@@ -1,0 +1,500 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const { URL, URLSearchParams } = require('url');
+const aws4 = require('aws4');
+
+const rootDir = path.resolve(__dirname, '..');
+const outputDir = path.join(rootDir, 'docs', 'platforms', 'data');
+
+function ensureOutputDir() {
+  fs.mkdirSync(outputDir, { recursive: true });
+}
+
+function escapeCell(value) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  return String(value).replace(/\|/g, '\\|').replace(/\r?\n/g, '<br />');
+}
+
+function writeTable(fileName, { title, intro, columns, rows }) {
+  if (!rows || rows.length === 0) {
+    return;
+  }
+
+  ensureOutputDir();
+  const filePath = path.join(outputDir, fileName);
+  const lines = [`# ${title}`, ''];
+
+  if (intro) {
+    lines.push(intro, '');
+  }
+
+  const header = `| ${columns.join(' | ')} |`;
+  const divider = `| ${columns.map(() => '---').join(' | ')} |`;
+  lines.push(header, divider);
+
+  for (const row of rows) {
+    lines.push(`| ${row.map(escapeCell).join(' | ')} |`);
+  }
+
+  fs.writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
+  console.log(`[write] ${path.relative(rootDir, filePath)}`);
+}
+
+function fetchJson(url, { method = 'GET', headers = {}, body } = {}) {
+  const requestUrl = typeof url === 'string' ? new URL(url) : url;
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      method,
+      hostname: requestUrl.hostname,
+      path: `${requestUrl.pathname}${requestUrl.search}`,
+      headers,
+    };
+
+    const req = https.request(options, (res) => {
+      const chunks = [];
+
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        const text = buffer.toString('utf8');
+
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          if (!text) {
+            resolve(null);
+            return;
+          }
+
+          try {
+            resolve(JSON.parse(text));
+          } catch (error) {
+            reject(
+              new Error(
+                `Failed to parse JSON from ${requestUrl.toString()}: ${error.message}`
+              )
+            );
+          }
+        } else {
+          reject(
+            new Error(
+              `HTTP ${res.statusCode} ${res.statusMessage || ''} when calling ${requestUrl.toString()}: ${text}`
+            )
+          );
+        }
+      });
+    });
+
+    req.on('error', reject);
+
+    if (body) {
+      req.write(body);
+    }
+
+    req.end();
+  });
+}
+
+function logSkip(service, reason) {
+  console.warn(`[skip] ${service}: ${reason}`);
+}
+
+async function updateAzureVoices() {
+  const key = process.env.AZURE_SPEECH_KEY;
+  const region = process.env.AZURE_SPEECH_REGION;
+
+  if (!key || !region) {
+    logSkip('azure', 'set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION to refresh the catalogue');
+    return;
+  }
+
+  const url = `https://${region}.tts.speech.microsoft.com/cognitiveservices/voices/list`;
+  const headers = {
+    'Ocp-Apim-Subscription-Key': key,
+  };
+
+  const data = await fetchJson(url, { headers });
+
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected Azure voice list response');
+  }
+
+  const rows = data
+    .slice()
+    .sort((a, b) => {
+      const localeDiff = (a.Locale || '').localeCompare(b.Locale || '');
+      if (localeDiff !== 0) {
+        return localeDiff;
+      }
+
+      return (a.ShortName || a.LocalName || '').localeCompare(b.ShortName || b.LocalName || '');
+    })
+    .map((voice) => [
+      voice.ShortName || voice.Name || '',
+      voice.Locale || '',
+      voice.Gender || '',
+      voice.VoiceType || '',
+      Array.isArray(voice.StyleList) ? voice.StyleList.join(', ') : '',
+      voice.SampleRateHertz || '',
+      voice.Status || '',
+    ]);
+
+  writeTable('azure-voices.md', {
+    title: 'Azure Speech Service voice catalogue',
+    intro: `Last updated ${new Date().toISOString()}.`,
+    columns: ['Short name', 'Locale', 'Gender', 'Type', 'Styles', 'Sample rate (Hz)', 'Status'],
+    rows,
+  });
+}
+
+async function updateGoogleVoices() {
+  const key = process.env.GOOGLE_TTS_API_KEY;
+
+  if (!key) {
+    logSkip('google', 'set GOOGLE_TTS_API_KEY to refresh the catalogue');
+    return;
+  }
+
+  const url = new URL('https://texttospeech.googleapis.com/v1/voices');
+  url.searchParams.set('key', key);
+
+  const data = await fetchJson(url);
+  const voices = data && Array.isArray(data.voices) ? data.voices : [];
+
+  if (!voices.length) {
+    logSkip('google', 'no voices returned from API');
+    return;
+  }
+
+  const rows = voices
+    .slice()
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .map((voice) => [
+      voice.name || '',
+      Array.isArray(voice.languageCodes) ? voice.languageCodes.join(', ') : '',
+      voice.ssmlGender || '',
+      voice.naturalSampleRateHertz || '',
+      Array.isArray(voice.supportedEngines) ? voice.supportedEngines.join(', ') : '',
+    ]);
+
+  writeTable('google-cloud-voices.md', {
+    title: 'Google Cloud Text-to-Speech voice catalogue',
+    intro: `Last updated ${new Date().toISOString()}.`,
+    columns: ['Name', 'Languages', 'Gender', 'Sample rate (Hz)', 'Engines'],
+    rows,
+  });
+}
+
+async function updateWatsonVoices() {
+  const urlText = process.env.WATSON_TTS_URL;
+  const apiKey = process.env.WATSON_TTS_API_KEY;
+
+  if (!urlText || !apiKey) {
+    logSkip('watson', 'set WATSON_TTS_URL and WATSON_TTS_API_KEY to refresh the catalogue');
+    return;
+  }
+
+  const apiUrl = new URL(urlText.endsWith('/') ? `${urlText}v1/voices` : `${urlText}/v1/voices`);
+  const headers = {
+    Authorization: `Basic ${Buffer.from(`apikey:${apiKey}`).toString('base64')}`,
+  };
+
+  const data = await fetchJson(apiUrl, { headers });
+  const voices = data && Array.isArray(data.voices) ? data.voices : [];
+
+  if (!voices.length) {
+    logSkip('watson', 'no voices returned from API');
+    return;
+  }
+
+  const rows = voices
+    .slice()
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .map((voice) => [
+      voice.name || '',
+      voice.language || '',
+      voice.gender || '',
+      voice.description || '',
+      voice.customizable ? 'yes' : 'no',
+      voice.supported_features && voice.supported_features.voice_transformation ? 'yes' : 'no',
+    ]);
+
+  writeTable('ibm-watson-voices.md', {
+    title: 'IBM Watson Text to Speech voice catalogue',
+    intro: `Last updated ${new Date().toISOString()}.`,
+    columns: ['Name', 'Language', 'Gender', 'Description', 'Custom pronunciation', 'Voice transformation'],
+    rows,
+  });
+}
+
+function fetchAwsJson({ service, region, path, method = 'GET', headers = {}, body, credentials }) {
+  const host = `${service}.${region}.amazonaws.com`;
+  const request = {
+    host,
+    path,
+    method,
+    service,
+    region,
+    headers: { ...headers },
+  };
+
+  if (body) {
+    request.body = body;
+    if (!request.headers['Content-Type']) {
+      request.headers['Content-Type'] = 'application/json';
+    }
+  }
+
+  aws4.sign(request, credentials);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        method: request.method,
+        hostname: request.host,
+        path: request.path,
+        headers: request.headers,
+      },
+      (res) => {
+        const chunks = [];
+
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+          const text = buffer.toString('utf8');
+
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            if (!text) {
+              resolve(null);
+              return;
+            }
+
+            try {
+              resolve(JSON.parse(text));
+            } catch (error) {
+              reject(
+                new Error(
+                  `Failed to parse JSON from https://${host}${path}: ${error.message}`
+                )
+              );
+            }
+          } else {
+            reject(
+              new Error(
+                `HTTP ${res.statusCode} ${res.statusMessage || ''} when calling https://${host}${path}: ${text}`
+              )
+            );
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+
+    if (body) {
+      req.write(body);
+    }
+
+    req.end();
+  });
+}
+
+async function updatePollyVoices() {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
+
+  if (!accessKeyId || !secretAccessKey || !region) {
+    logSkip(
+      'amazon-polly',
+      'set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION (or AWS_DEFAULT_REGION) to refresh the catalogue'
+    );
+    return;
+  }
+
+  const credentials = {
+    accessKeyId,
+    secretAccessKey,
+  };
+
+  if (process.env.AWS_SESSION_TOKEN) {
+    credentials.sessionToken = process.env.AWS_SESSION_TOKEN;
+  }
+
+  const voices = [];
+  let nextToken = null;
+
+  do {
+    const params = new URLSearchParams({ IncludeAdditionalLanguageCodes: 'true' });
+
+    if (nextToken) {
+      params.set('NextToken', nextToken);
+    }
+
+    const query = params.toString();
+    const path = query ? `/v1/voices?${query}` : '/v1/voices';
+
+    const data = await fetchAwsJson({
+      service: 'polly',
+      region,
+      path,
+      credentials,
+    });
+
+    const chunk = data && Array.isArray(data.Voices) ? data.Voices : [];
+
+    voices.push(...chunk);
+    nextToken = data && data.NextToken ? data.NextToken : null;
+  } while (nextToken);
+
+  if (!voices.length) {
+    logSkip('amazon-polly', 'no voices returned from API');
+    return;
+  }
+
+  const rows = voices
+    .slice()
+    .sort((a, b) => {
+      const languageDiff = (a.LanguageCode || '').localeCompare(b.LanguageCode || '');
+
+      if (languageDiff !== 0) {
+        return languageDiff;
+      }
+
+      return (a.Id || '').localeCompare(b.Id || '');
+    })
+    .map((voice) => [
+      voice.Id || '',
+      voice.Name || '',
+      voice.LanguageCode || '',
+      voice.LanguageName || '',
+      voice.Gender || '',
+      Array.isArray(voice.SupportedEngines) ? voice.SupportedEngines.join(', ') : '',
+      Array.isArray(voice.AdditionalLanguageCodes)
+        ? voice.AdditionalLanguageCodes.join(', ')
+        : '',
+    ]);
+
+  writeTable('amazon-polly-voices.md', {
+    title: 'Amazon Polly voice catalogue',
+    intro: `Last updated ${new Date().toISOString()}.`,
+    columns: [
+      'Id',
+      'Name',
+      'Language code',
+      'Language name',
+      'Gender',
+      'Engines',
+      'Additional languages',
+    ],
+    rows,
+  });
+}
+
+function loadJsonFromFile(envVar) {
+  const filePath = process.env[envVar];
+
+  if (!filePath) {
+    return null;
+  }
+
+  const resolved = path.isAbsolute(filePath)
+    ? filePath
+    : path.join(process.cwd(), filePath);
+
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`File specified by ${envVar} not found: ${resolved}`);
+  }
+
+  const raw = fs.readFileSync(resolved, 'utf8');
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Unable to parse JSON from ${resolved}: ${error.message}`);
+  }
+}
+
+function updateSapiVoicesFromFile() {
+  const data = loadJsonFromFile('SAPI_VOICE_EXPORT');
+
+  if (!data) {
+    logSkip('sapi', 'set SAPI_VOICE_EXPORT to a JSON file exported from GetInstalledVoices');
+    return;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    logSkip('sapi', 'voice export file did not contain any entries');
+    return;
+  }
+
+  const rows = data
+    .slice()
+    .sort((a, b) => (a.Name || '').localeCompare(b.Name || ''))
+    .map((voice) => [
+      voice.Name || voice.DisplayName || '',
+      voice.Id || '',
+      voice.Gender || '',
+      voice.Language || voice.Culture || '',
+    ]);
+
+  writeTable('microsoft-sapi-voices.md', {
+    title: 'Microsoft SAPI voice catalogue',
+    intro: `Last updated ${new Date().toISOString()}.`,
+    columns: ['Name', 'Id', 'Gender', 'Language'],
+    rows,
+  });
+}
+
+function updateAppleVoicesFromFile() {
+  const data = loadJsonFromFile('APPLE_VOICE_EXPORT');
+
+  if (!data) {
+    logSkip('apple', 'set APPLE_VOICE_EXPORT to a JSON file exported from AVSpeechSynthesisVoice');
+    return;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    logSkip('apple', 'voice export file did not contain any entries');
+    return;
+  }
+
+  const rows = data
+    .slice()
+    .sort((a, b) => (a.identifier || a.name || '').localeCompare(b.identifier || b.name || ''))
+    .map((voice) => [
+      voice.identifier || '',
+      voice.name || '',
+      voice.language || '',
+      voice.quality || '',
+    ]);
+
+  writeTable('apple-avspeechsynthesizer-voices.md', {
+    title: 'Apple AVSpeechSynthesizer voice catalogue',
+    intro: `Last updated ${new Date().toISOString()}.`,
+    columns: ['Identifier', 'Name', 'Language', 'Quality'],
+    rows,
+  });
+}
+
+(async () => {
+  try {
+    await Promise.all([
+      updateAzureVoices(),
+      updateGoogleVoices(),
+      updatePollyVoices(),
+      updateWatsonVoices(),
+    ]);
+
+    updateSapiVoicesFromFile();
+    updateAppleVoicesFromFile();
+  } catch (error) {
+    console.error(error.message || error);
+    process.exitCode = 1;
+  }
+})();
