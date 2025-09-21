@@ -7,7 +7,7 @@
 
 ## Speech Markdown status
 
-Speech Markdown lacks a Watson formatter today; only Amazon, Azure, Google, Samsung, and text outputs are wired into the formatter factory.【F:src/formatters/FormatterFactory.ts†L1-L39】 Integrating Watson support would require mapping modifiers to the service's `<express-as>`, `<voice-transformation>`, and custom pronunciation dictionaries while handling features unique to IBM's SSML dialect.
+Speech Markdown now ships an IBM Watson formatter that translates the core modifiers into Watson-compatible SSML. The implementation covers `say-as`, `sub`, `phoneme`, `emphasis`, and prosody attributes, while leaving Watson-exclusive constructs such as `<express-as>` or voice transformations untouched so the generated markup stays within the documented subset of the service.【F:src/formatters/FormatterFactory.ts†L1-L39】【F:src/formatters/IbmWatsonSsmlFormatter.ts†L6-L213】
 
 ## Voice catalogue
 

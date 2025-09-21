@@ -7,7 +7,7 @@
 
 ## Speech Markdown status
 
-Speech Markdown does not ship with an Apple-specific formatter. The FormatterFactory only exposes Amazon, Azure, Google, Samsung, and text emitters, so generating AVSpeechSynthesizer requests currently requires manual SSML or direct use of `AVSpeechUtterance` properties.【F:src/formatters/FormatterFactory.ts†L1-L39】 Adding native support would involve aligning Speech Markdown constructs with the limited subset of SSML that AVSpeechSynthesizer recognises (notably `phoneme`, `sub`, and pronunciation hints).
+Speech Markdown now exposes an AVSpeechSynthesizer formatter that focuses on the subset of SSML Apple accepts. The formatter enables `say-as` for characters and numbers, preserves substitution and IPA hints, and keeps voice selections in the output while intentionally ignoring unsupported prosody keys such as `rate`, `pitch`, `volume`, and `whisper` so AVSpeechSynthesizer falls back to native utterance configuration.【F:src/formatters/FormatterFactory.ts†L1-L39】【F:src/formatters/AppleAvSpeechSynthesizerSsmlFormatter.ts†L6-L136】
 
 ## Voice catalogue
 

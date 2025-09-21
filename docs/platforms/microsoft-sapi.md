@@ -6,7 +6,7 @@
 
 ## Speech Markdown status
 
-Speech Markdown does not currently provide a dedicated SAPI formatter. The existing formatters target cloud SSML dialects (Amazon, Azure, Google, Samsung) and the plain text formatter, so Windows desktop scenarios must either rely on the generic Text formatter or craft SSML manually for SAPI consumers.【F:src/formatters/FormatterFactory.ts†L1-L39】 Implementing a SAPI formatter would require mapping Speech Markdown's modifiers onto the `<SPEAK>` XML schema and reconciling SAPI's unique phoneme, bookmark, and audio tag semantics.
+The library now includes a SAPI-specific formatter that converts Speech Markdown modifiers into SAPI-friendly SSML, including emitting `<emph>` for emphasis, mapping `say-as` values that Windows voices understand, and selecting voices via the `required="Name=…"` pattern expected by desktop engines.【F:src/formatters/FormatterFactory.ts†L1-L39】【F:src/formatters/MicrosoftSapiSsmlFormatter.ts†L6-L214】 Unsupported effects such as whispering or neural styles are ignored so the output remains valid for classic SAPI synthesizers.
 
 ## Voice catalogue
 

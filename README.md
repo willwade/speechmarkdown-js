@@ -11,8 +11,11 @@ Supported platforms:
 - amazon-alexa
 - amazon-polly
 - amazon-polly-neural
+- apple-avspeechsynthesizer
 - google-assistant
+- ibm-watson
 - microsoft-azure
+- microsoft-sapi
 - samsung-bixby
 
 Find the architecture [here](./docs/architecture.md)
@@ -128,8 +131,11 @@ Available options are:
   - "amazon-alexa"
   - "amazon-polly"
   - "amazon-polly-neural"
+  - "apple-avspeechsynthesizer"
   - "google-assistant"
+  - "ibm-watson"
   - "microsoft-azure"
+  - "microsoft-sapi"
   - "samsung-bixby"
 
 - `includeFormatterComment` (boolean) - Adds an XML comment to the SSML output indicating the formatter used. Default is `false`.
