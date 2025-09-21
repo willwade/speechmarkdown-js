@@ -50,6 +50,14 @@ export class TagsObject {
     const handled =
       this.voiceTagNamed(this.base.options && this.base.options.voices, name) ||
       this.voiceTagNamed(this.base.validVoices, name);
+
+    if (!handled) {
+      const fallback = this.base.getVoiceTagFallback(name);
+
+      if (fallback) {
+        this.tag('voice', fallback);
+      }
+    }
   }
 }
 
@@ -316,6 +324,10 @@ export abstract class SsmlFormatterBase extends FormatterBase {
     // console.log([unescaped, reversed, escaped].join('\n'));
 
     return escaped;
+  }
+
+  public getVoiceTagFallback(name: string): Record<string, string> | null {
+    return null;
   }
 
   protected abstract formatFromAst(ast: any, lines: string[]): string[];

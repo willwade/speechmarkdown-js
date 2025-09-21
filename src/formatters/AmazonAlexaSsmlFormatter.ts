@@ -46,6 +46,14 @@ export class AmazonAlexaSsmlFormatter extends SsmlFormatterBase {
     this.modifierKeyToSsmlTagMappings.disappointed = 'amazon:emotion';
   }
 
+  public getVoiceTagFallback(name: string): Record<string, string> | null {
+    if (name.toLowerCase() === 'device') {
+      return null;
+    }
+
+    return { name };
+  }
+
   // tslint:disable-next-line: max-func-body-length
   private getTextModifierObject(ast: any): any {
     let textModifierObject = new TagsObject(this);

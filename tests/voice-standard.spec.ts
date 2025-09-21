@@ -204,7 +204,7 @@ describe('voice-standard lowercase name', () => {
   });
 });
 
-describe('voice-standard invalid name', () => {
+describe('voice-standard unknown name', () => {
   const speech = new SpeechMarkdown();
 
   const markdown = dedent`
@@ -220,8 +220,8 @@ describe('voice-standard invalid name', () => {
 
     const expected = dedent`
       <speak>
-      Why do you keep switching voices from one to <voice name="Kendra">the other</voice>?
-      Why do you keep switching voices from one to <voice name="Kendra">the other</voice>?
+      Why do you keep switching voices <voice name="Brianzzzz">from one</voice> to <voice name="Kendra">the other</voice>?
+      Why do you keep switching voices <voice name="Brianzzzz">from one</voice> to <voice name="Kendra">the other</voice>?
       </speak>
     `;
 
@@ -371,5 +371,26 @@ describe('voice-standard device name', () => {
     `;
 
     expect(text).toBe(expected);
+  });
+});
+
+describe('voice-standard new Alexa voices', () => {
+  const speech = new SpeechMarkdown();
+
+  test('converts to SSML - Amazon Alexa', () => {
+    const markdown = "Try the new (voice)[voice:'Lupe'].";
+
+    const options = {
+      platform: 'amazon-alexa',
+    };
+    const ssml = speech.toSSML(markdown, options);
+
+    const expected = dedent`
+      <speak>
+      Try the new <voice name="Lupe">voice</voice>.
+      </speak>
+    `;
+
+    expect(ssml).toBe(expected);
   });
 });

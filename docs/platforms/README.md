@@ -10,6 +10,7 @@ This directory contains reference notes about the SSML dialects that Speech Mark
 ## Available platform notes
 
 - [Amazon Polly](./amazon-polly.md)
+- [Amazon Alexa](./amazon-alexa.md)
 - [Apple AVSpeechSynthesizer](./apple-avspeechsynthesizer.md)
 - [Google Cloud Text-to-Speech](./google-cloud-tts.md)
 - [IBM Watson Text to Speech](./ibm-watson-tts.md)
