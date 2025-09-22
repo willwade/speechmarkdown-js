@@ -11,11 +11,16 @@ Supported platforms:
 - amazon-alexa
 - amazon-polly
 - amazon-polly-neural
+- apple-avspeechsynthesizer
 - google-assistant
+- ibm-watson
 - microsoft-azure
+- microsoft-sapi
 - samsung-bixby
 
 Find the architecture [here](./docs/architecture.md)
+
+Platform-specific SSML notes and voice catalogues are tracked in [`docs/platforms`](./docs/platforms/README.md). The helper command `npm run docs:update-voices` regenerates the catalogues when vendor credentials are available.
 
 ## Quick start
 
@@ -126,8 +131,11 @@ Available options are:
   - "amazon-alexa"
   - "amazon-polly"
   - "amazon-polly-neural"
+  - "apple-avspeechsynthesizer"
   - "google-assistant"
+  - "ibm-watson"
   - "microsoft-azure"
+  - "microsoft-sapi"
   - "samsung-bixby"
 
 - `includeFormatterComment` (boolean) - Adds an XML comment to the SSML output indicating the formatter used. Default is `false`.
