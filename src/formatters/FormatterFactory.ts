@@ -12,6 +12,8 @@ import { AppleAvSpeechSynthesizerSsmlFormatter } from './AppleAvSpeechSynthesize
 import { IbmWatsonSsmlFormatter } from './IbmWatsonSsmlFormatter';
 import { ElevenLabsFormatter } from './ElevenLabsFormatter';
 import { W3cSsmlFormatter } from './W3cSsmlFormatter';
+import { AcapelaCloudSsmlFormatter } from './AcapelaCloudSsmlFormatter';
+import { AcapelaDesktopFormatter } from './AcapelaDesktopFormatter';
 
 export function createFormatter(options: SpeechOptions): Formatter {
   switch (options.platform) {
@@ -37,6 +39,10 @@ export function createFormatter(options: SpeechOptions): Formatter {
       return new IbmWatsonSsmlFormatter(options);
     case 'elevenlabs':
       return new ElevenLabsFormatter(options);
+    case 'acapela-cloud':
+      return new AcapelaCloudSsmlFormatter(options);
+    case 'acapela':
+      return new AcapelaDesktopFormatter(options);
     default:
       return new TextFormatter(options);
   }
