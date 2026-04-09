@@ -35,9 +35,22 @@ export class TagsObject {
         };
       }
 
+      // Filter out metadata fields (id, displayName, languages, language, locale, isHD)
+      // Only process SSML tag keys (voice, lang, etc.)
+      const metadataKeys = [
+        'id',
+        'displayName',
+        'languages',
+        'language',
+        'locale',
+        'isHD',
+      ];
+
       Object.keys(info).forEach((tag: string) => {
-        const attributes = info[tag];
-        this.tag(tag, attributes);
+        if (!metadataKeys.includes(tag)) {
+          const attributes = info[tag];
+          this.tag(tag, attributes);
+        }
       });
       return true;
     }

@@ -5,19 +5,37 @@ import { SsmlFormatterBase, TagsObject } from './SsmlFormatterBase';
 export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
   public validVoices: Record<string, any> = MICROSOFT_AZURE_TTS_VOICES;
 
+  // Valid style degree range for mstts:express-as
+  private minStyleDegree: number = 0.01;
+  private maxStyleDegree: number = 2.0;
+
+  // Valid roles for mstts:express-as
+  private validRoles: string[] = [
+    'Girl',
+    'Boy',
+    'YoungAdultFemale',
+    'YoungAdultMale',
+    'OlderAdultFemale',
+    'OlderAdultMale',
+    'SeniorFemale',
+    'SeniorMale',
+  ];
+
+
   constructor(public options: SpeechOptions) {
     super(options);
 
-    this.modifierKeyToSsmlTagMappings.emphasis = null;
+    // Core W3C SSML elements supported by Azure
+    this.modifierKeyToSsmlTagMappings.emphasis = 'emphasis';
     this.modifierKeyToSsmlTagMappings.address = 'say-as';
     this.modifierKeyToSsmlTagMappings.number = 'say-as';
     this.modifierKeyToSsmlTagMappings.characters = 'say-as';
-    this.modifierKeyToSsmlTagMappings.expletive = null;
+    this.modifierKeyToSsmlTagMappings.expletive = null; // Not supported by Azure
     this.modifierKeyToSsmlTagMappings.fraction = 'say-as';
-    this.modifierKeyToSsmlTagMappings.interjection = null;
+    this.modifierKeyToSsmlTagMappings.interjection = null; // Not supported by Azure
     this.modifierKeyToSsmlTagMappings.ordinal = 'say-as';
     this.modifierKeyToSsmlTagMappings.telephone = 'say-as';
-    this.modifierKeyToSsmlTagMappings.unit = null;
+    this.modifierKeyToSsmlTagMappings.unit = null; // Not supported by Azure
     this.modifierKeyToSsmlTagMappings.time = 'say-as';
     this.modifierKeyToSsmlTagMappings.date = 'say-as';
     this.modifierKeyToSsmlTagMappings.sub = 'sub';
@@ -27,12 +45,127 @@ export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
     this.modifierKeyToSsmlTagMappings.volume = 'prosody';
     this.modifierKeyToSsmlTagMappings.whisper = 'prosody';
     this.modifierKeyToSsmlTagMappings.voice = 'voice';
+    this.modifierKeyToSsmlTagMappings.lang = 'lang';
+
+    // Azure mstts:express-as attributes
+    this.modifierKeyToSsmlTagMappings.style = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.role = 'mstts:express-as';
+
+    // Azure mstts:express-as styles
     this.modifierKeyToSsmlTagMappings.newscaster = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.excited = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.disappointed = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.friendly = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.cheerful = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.sad = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.angry = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.fearful = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.empathetic = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.calm = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.lyrical = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.hopeful = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.terrified = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.shouting = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.whispering = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.unfriendly = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.gentle = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.serious = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.depressed = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.embarrassed = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.disgruntled = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.envious = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.affectionate = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.assistant = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.chat = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.customerservice = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings['poetry-reading'] = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings['narration-professional'] =
+      'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings['narration-relaxed'] = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings['newscast-casual'] = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings['newscast-formal'] = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings['documentary-narration'] =
+      'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.advertisement_upbeat = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.sports_commentary = 'mstts:express-as';
+    this.modifierKeyToSsmlTagMappings.sports_commentary_excited =
+      'mstts:express-as';
+
+    // Define tag sort order for nested SSML elements
+    this.ssmlTagSortOrder = [
+      'emphasis',
+      'mstts:express-as',
+      'say-as',
+      'prosody',
+      'voice',
+      'lang',
+      'sub',
+      'phoneme',
+    ];
+  }
+
+  public getVoiceTagFallback(name: string): Record<string, string> | null {
+    if (name.toLowerCase() === 'device') {
+      return null;
+    }
+
+    return { name };
+  }
+
+  /**
+   * Checks if the generated SSML contains any MSTTS-specific tags
+   * @param lines Array of SSML lines to check
+   * @returns true if any line contains an mstts: tag
+   */
+  private containsMsttsTag(lines: string[]): boolean {
+    const msttsPrefixRegex = /<\/?mstts:/;
+    return lines.some((line: string) => msttsPrefixRegex.test(line));
+  }
+
+  /**
+   * Override addSpeakTag to automatically inject xmlns:mstts namespace
+   * when MSTTS-specific tags are detected in the output
+   */
+  protected addSpeakTag(
+    ast: any,
+    newLine: boolean,
+    newLineAfterEnd: boolean,
+    attr: any,
+    lines: string[],
+  ): string[] {
+    // First, process the AST to generate the content
+    const contentLines: string[] = [];
+    this.processAst(ast, contentLines);
+    this.addSectionEndTag(contentLines);
+
+    // Check if MSTTS tags are present in the generated content
+    const hasMsttsTag = this.containsMsttsTag(contentLines);
+
+    // Build attributes for the speak tag
+    let speakAttrs = attr;
+    if (hasMsttsTag) {
+      speakAttrs = speakAttrs || {};
+      speakAttrs['xmlns:mstts'] = 'https://www.w3.org/2001/mstts';
+    }
+
+    // Add the speak tag with appropriate namespace
+    lines.push(this.startTag('speak', speakAttrs, newLine));
+    lines.push(...contentLines);
+    lines.push(this.endTag('speak', newLine));
+
+    if (newLineAfterEnd) {
+      lines.push('\n');
+    }
+
+    return lines;
   }
 
   // tslint:disable-next-line: max-func-body-length
   private getTextModifierObject(ast: any): any {
     let textModifierObject = new TagsObject(this);
+
+    // Collect express-as attributes (style, role, styledegree)
+    let expressAsAttrs: Record<string, string> = {};
 
     for (let index = 0; index < ast.children.length; index++) {
       const child = ast.children[index];
@@ -114,15 +247,84 @@ export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
             }
 
             case 'voice': {
-              const name = this.sentenceCase(value || 'device');
+              textModifierObject.voiceTag(ssmlTag, value);
+              break;
+            }
 
-              // TODO: valid voices list may not be useful when there're custom voices.
-              // TODO: convert to use the TagsObject.voiceTagNamed()
-              if (name != 'Device') {
-                textModifierObject.tag(ssmlTag, { name: name });
+            // Azure mstts:express-as explicit style attribute
+            case 'style': {
+              // Store style value for later use
+              expressAsAttrs['style'] = value;
+              break;
+            }
+
+            // Azure mstts:express-as role attribute
+            case 'role': {
+              // Store role value for later use
+              expressAsAttrs['role'] = value;
+              break;
+            }
+
+            // Azure mstts:express-as styles (shorthand syntax)
+            case 'excited':
+            case 'disappointed':
+            case 'friendly':
+            case 'cheerful':
+            case 'sad':
+            case 'angry':
+            case 'fearful':
+            case 'empathetic':
+            case 'calm':
+            case 'lyrical':
+            case 'hopeful':
+            case 'terrified':
+            case 'shouting':
+            case 'whispering':
+            case 'unfriendly':
+            case 'gentle':
+            case 'serious':
+            case 'depressed':
+            case 'embarrassed':
+            case 'disgruntled':
+            case 'envious':
+            case 'affectionate':
+            case 'assistant':
+            case 'chat':
+            case 'customerservice':
+            case 'poetry-reading':
+            case 'narration-professional':
+            case 'narration-relaxed':
+            case 'newscast-casual':
+            case 'newscast-formal':
+            case 'newscaster':
+            case 'documentary-narration':
+            case 'advertisement_upbeat':
+            case 'sports_commentary':
+            case 'sports_commentary_excited': {
+              // Store style in expressAsAttrs
+              expressAsAttrs['style'] = key === 'newscaster' ? 'newscast' : key;
+
+              // Handle styledegree if provided (value should be a number between 0.01 and 2.0)
+              if (value) {
+                const styleDegree = parseFloat(value);
+                if (
+                  !isNaN(styleDegree) &&
+                  styleDegree >= this.minStyleDegree &&
+                  styleDegree <= this.maxStyleDegree
+                ) {
+                  expressAsAttrs['styledegree'] = value;
+                }
               }
               break;
             }
+
+            case 'lang':
+              textModifierObject.tag(ssmlTag, { 'xml:lang': value });
+              break;
+
+            case 'voice':
+              textModifierObject.voiceTag(ssmlTag, value);
+              break;
 
             default: {
             }
@@ -130,6 +332,12 @@ export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
           break;
         }
       }
+    }
+
+    // Apply collected express-as attributes if style is present
+    if (expressAsAttrs['style']) {
+      const ssmlTag = this.modifierKeyToSsmlTagMappings['excited']; // Get mstts:express-as tag
+      textModifierObject.tag(ssmlTag, expressAsAttrs);
     }
 
     return textModifierObject;
@@ -149,14 +357,8 @@ export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
         const ssmlTag = this.modifierKeyToSsmlTagMappings[key];
 
         switch (key) {
-          // TODO: valid voices list may not be useful when there're custom voices.
-          // TODO: convert to use the TagsObject.voiceTagNamed()
           case 'voice': {
-            const name = this.sentenceCase(value || 'device');
-
-            if (name != 'Device') {
-              sectionObject.tag(ssmlTag, { name: name });
-            }
+            sectionObject.voiceTag(ssmlTag, value);
             break;
           }
 
@@ -164,8 +366,68 @@ export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
             break;
           }
 
+          // Azure mstts:express-as styles
+          case 'excited':
+          case 'disappointed':
+          case 'friendly':
+          case 'cheerful':
+          case 'sad':
+          case 'angry':
+          case 'fearful':
+          case 'empathetic':
+          case 'calm':
+          case 'lyrical':
+          case 'hopeful':
+          case 'terrified':
+          case 'shouting':
+          case 'whispering':
+          case 'unfriendly':
+          case 'gentle':
+          case 'serious':
+          case 'depressed':
+          case 'embarrassed':
+          case 'disgruntled':
+          case 'envious':
+          case 'affectionate':
+          case 'assistant':
+          case 'chat':
+          case 'customerservice':
+          case 'poetry-reading':
+          case 'narration-professional':
+          case 'narration-relaxed':
+          case 'newscast-casual':
+          case 'newscast-formal':
           case 'newscaster':
-            sectionObject.tag(ssmlTag, { style: 'newscast' });
+          case 'documentary-narration':
+          case 'advertisement_upbeat':
+          case 'sports_commentary':
+          case 'sports_commentary_excited': {
+            const attrs: Record<string, string> = {
+              style: key === 'newscaster' ? 'newscast' : key,
+            };
+
+            // Handle styledegree if provided (value should be a number between 0.01 and 2.0)
+            if (value) {
+              const styleDegree = parseFloat(value);
+              if (
+                !isNaN(styleDegree) &&
+                styleDegree >= this.minStyleDegree &&
+                styleDegree <= this.maxStyleDegree
+              ) {
+                attrs['styledegree'] = value;
+              }
+            }
+
+            sectionObject.tag(ssmlTag, attrs);
+            break;
+          }
+
+          case 'lang':
+            sectionObject.tag(ssmlTag, { 'xml:lang': value });
+            break;
+
+          case 'voice':
+            sectionObject.voiceTag(ssmlTag, value);
             break;
 
           default: {
@@ -220,15 +482,37 @@ export class MicrosoftAzureSsmlFormatter extends SsmlFormatterBase {
         }
         return this.addTagWithAttrs(lines, null, 'break', attrs);
       }
-      case 'shortEmphasisModerate':
-      case 'shortEmphasisStrong':
-      case 'shortEmphasisNone':
+      case 'markTag': {
+        const name = ast.children[0].allText;
+        return this.addTagWithAttrs(
+          lines,
+          null,
+          'bookmark',
+          { mark: name },
+          false,
+        );
+      }
+      case 'shortEmphasisModerate': {
+        const text = ast.children[0].allText;
+        return this.addTagWithAttrs(lines, text, 'emphasis', {
+          level: 'moderate',
+        });
+      }
+      case 'shortEmphasisStrong': {
+        const text = ast.children[0].allText;
+        return this.addTagWithAttrs(lines, text, 'emphasis', {
+          level: 'strong',
+        });
+      }
+      case 'shortEmphasisNone': {
+        const text = ast.children[0].allText;
+        return this.addTagWithAttrs(lines, text, 'emphasis', { level: 'none' });
+      }
       case 'shortEmphasisReduced': {
         const text = ast.children[0].allText;
-        if (text) {
-          lines.push(text);
-        }
-        return lines;
+        return this.addTagWithAttrs(lines, text, 'emphasis', {
+          level: 'reduced',
+        });
       }
 
       case 'textModifier': {

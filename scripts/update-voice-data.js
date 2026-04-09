@@ -183,19 +183,58 @@ async function updateAzureVoices() {
   }
 
   const voiceMap = {};
+  const displayNameCollisions = {};
 
   for (const voice of data) {
     const name = (voice.ShortName || voice.Name || '').trim();
+    const locale = (voice.Locale || '').trim();
+    const displayName = voice.DisplayName || voice.LocalName || name;
 
     if (!name) {
       continue;
     }
 
-    voiceMap[name.toLowerCase()] = {
+    const voiceEntry = {
       voice: {
         name,
       },
+      id: name,
+      displayName,
+      locale,
     };
+
+    // Add entry by voice ID (e.g., "en-us-jennyneural")
+    voiceMap[name.toLowerCase()] = voiceEntry;
+
+    // Also add entry by display name (e.g., "jenny") for easier lookup
+    // Only add if display name is different from the voice ID
+    const displayNameKey = displayName.toLowerCase();
+    if (displayNameKey !== name.toLowerCase()) {
+      if (!voiceMap[displayNameKey]) {
+        voiceMap[displayNameKey] = voiceEntry;
+      } else {
+        // Track collisions for debugging
+        if (!displayNameCollisions[displayNameKey]) {
+          displayNameCollisions[displayNameKey] = [];
+        }
+        displayNameCollisions[displayNameKey].push(name);
+      }
+    }
+  }
+
+  // Log collisions if any
+  const collisionKeys = Object.keys(displayNameCollisions);
+  if (collisionKeys.length > 0) {
+    console.log(
+      `[azure] ${collisionKeys.length} display name collisions (not added as aliases):`,
+    );
+    collisionKeys.slice(0, 5).forEach((key) => {
+      console.log(
+        `  "${key}": ${displayNameCollisions[key].slice(0, 3).join(', ')}${
+          displayNameCollisions[key].length > 3 ? '...' : ''
+        }`,
+      );
+    });
   }
 
   writeFormatterVoiceModule('microsoftAzureVoices.ts', [
@@ -229,6 +268,10 @@ async function updateGoogleVoices() {
 
   for (const voice of voices) {
     const name = (voice.name || '').trim();
+    const languageCodes =
+      voice.languageCodes && Array.isArray(voice.languageCodes)
+        ? voice.languageCodes
+        : [];
 
     if (!name) {
       continue;
@@ -238,6 +281,8 @@ async function updateGoogleVoices() {
       voice: {
         name,
       },
+      id: name,
+      languages: languageCodes,
     };
   }
 
@@ -282,6 +327,7 @@ async function updateWatsonVoices() {
 
   for (const voice of voices) {
     const name = (voice.name || '').trim();
+    const language = (voice.language || '').trim();
 
     if (!name) {
       continue;
@@ -291,6 +337,8 @@ async function updateWatsonVoices() {
       voice: {
         name,
       },
+      id: name,
+      language,
     };
   }
 
@@ -456,10 +504,26 @@ async function updatePollyVoices() {
     }
 
     const key = id.toLowerCase();
+    const languageCodes = [];
+
+    if (voice.LanguageCode) {
+      languageCodes.push(voice.LanguageCode);
+    }
+
+    if (
+      voice.AdditionalLanguageCodes &&
+      Array.isArray(voice.AdditionalLanguageCodes)
+    ) {
+      languageCodes.push(...voice.AdditionalLanguageCodes);
+    }
+
     const entry = {
       voice: {
         name: id,
       },
+      id,
+      displayName: voice.Name || id,
+      languages: languageCodes,
     };
 
     allVoices[key] = entry;

@@ -168,8 +168,45 @@ export function speechMarkdownGrammar(myna: any): any {
       'timbre',
       'lang',
       'voice',
+      // Azure MSTTS express-as attributes
+      'style',
+      'role',
+      // Azure MSTTS express-as styles
       'excited',
       'disappointed',
+      'friendly',
+      'cheerful',
+      'sad',
+      'angry',
+      'fearful',
+      'empathetic',
+      'calm',
+      'lyrical',
+      'hopeful',
+      'shouting',
+      'whispering',
+      'terrified',
+      'unfriendly',
+      'gentle',
+      'serious',
+      'depressed',
+      'embarrassed',
+      'disgruntled',
+      'affectionate',
+      'envious',
+      'chat',
+      'customerservice',
+      'assistant',
+      'poetry-reading',
+      'narration-professional',
+      'narration-relaxed',
+      'newscast-casual',
+      'newscast-formal',
+      'newscaster',
+      'documentary-narration',
+      'advertisement_upbeat',
+      'sports_commentary',
+      'sports_commentary_excited',
     ).ast;
     // Special characters for <phoneme alphabet="ipa" ph="..."> tag
     // const ipaChars = ['.', "'", 'æ', '͡ʒ', 'ð', 'ʃ', '͡ʃ', 'θ', 'ʒ', 'ə', 'ɚ', 'aɪ', 'aʊ', 'ɑ',
@@ -232,7 +269,22 @@ export function speechMarkdownGrammar(myna: any): any {
       this.shortSubValue,
       '}',
     ).ast;
-    this.bareIpa = m.seq('/', this.shortIpaValue, '/').ast;
+    // Same characters as this.url / audio unquoted URLs (keep in sync with urlSpecialChar).
+    const urlUnquotedSpecials = ':/.-_~?#[]@!+,;%=()&';
+    // Bare IPA uses /phoneme/. The same delimiter appears in URL paths; only
+    // treat /.../ as IPA when '/' is not immediately after a host/path character
+    // (same set as letters, digits, and unquoted URL specials), e.g. after "foo+"
+    // or "https://example.com".
+    const bareIpaMayOpenHere = m.predicate((p: any) => {
+      if (p.index === 0) {
+        return true;
+      }
+      const prev = p.input.charAt(p.index - 1);
+      const urlInterior =
+        /[A-Za-z0-9]/.test(prev) || urlUnquotedSpecials.includes(prev);
+      return !urlInterior;
+    });
+    this.bareIpa = m.seq(bareIpaMayOpenHere, '/', this.shortIpaValue, '/').ast;
 
     const percentChange = ['+', m.hyphen, m.digit, '%'];
 
@@ -278,7 +330,7 @@ export function speechMarkdownGrammar(myna: any): any {
     ).ast;
 
     // Audio
-    this.urlSpecialChar = m.char(':/.-_~?#[]@!+,;%=()&');
+    this.urlSpecialChar = m.char(urlUnquotedSpecials);
     this.url = m.choice(m.digit, m.letter, this.urlSpecialChar).oneOrMore.ast;
     this.audio = m.seq(
       '!',
@@ -295,9 +347,42 @@ export function speechMarkdownGrammar(myna: any): any {
       'voice',
       'defaults',
       'dj',
-      'newscaster',
+      // Azure MSTTS express-as styles
       'excited',
       'disappointed',
+      'friendly',
+      'cheerful',
+      'sad',
+      'angry',
+      'fearful',
+      'empathetic',
+      'calm',
+      'lyrical',
+      'hopeful',
+      'shouting',
+      'whispering',
+      'terrified',
+      'unfriendly',
+      'gentle',
+      'serious',
+      'depressed',
+      'embarrassed',
+      'disgruntled',
+      'affectionate',
+      'envious',
+      'chat',
+      'customerservice',
+      'assistant',
+      'poetry-reading',
+      'narration-professional',
+      'narration-relaxed',
+      'newscast-casual',
+      'newscast-formal',
+      'newscaster',
+      'documentary-narration',
+      'advertisement_upbeat',
+      'sports_commentary',
+      'sports_commentary_excited',
     ).ast;
     this.sectionModifierText = m.choice(
       m.digit,
